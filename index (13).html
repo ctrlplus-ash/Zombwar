@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ZOMBWAR: Realms of the Warrior</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; user-select: none; touch-action: none; }
+        
+        /* UI LAYERS */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #hud { display: none; padding: 20px; color: white; text-shadow: 2px 2px 0 #000; }
+        
+        .bar-wrap { margin-bottom: 8px; }
+        .bar-label { font-size: 14px; font-weight: bold; margin-bottom: 2px;}
+        .bar-container { width: 250px; height: 15px; background: #333; border: 2px solid #555; position: relative; }
+        #hp-bar { width: 100%; height: 100%; background: #ff0044; transition: width 0.2s; }
+        #xp-bar { width: 0%; height: 100%; background: #00ccff; transition: width 0.2s; }
+        #ult-bar { width: 0%; height: 100%; background: #ffcc00; transition: width 0.1s; }
+        
+        #stats { font-size: 20px; font-weight: bold; color: #eee; margin-bottom: 15px; }
+        #objective { font-size: 18px; color: #ffcc00; margin-top: 10px; font-weight: bold; }
+
+        #message-area { 
+            position: absolute; top: 20%; width: 100%; text-align: center; 
+            color: #fff; font-size: 40px; font-weight: bold; text-shadow: 0 0 20px #00ccff;
+            opacity: 0; transition: opacity 0.5s;
+        }
+
+        /* SCREENS */
+        .menu-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            pointer-events: auto; color: white; z-index: 50;
+        }
+        
+        /* CARDS */
+        .card-container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        .card {
+            background: #222; border: 2px solid #555; width: 160px; padding: 20px;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .card:hover { transform: scale(1.05); border-color: #ffcc00; background: #333; }
+        .card h3 { color: #ffcc00; margin-top: 0; }
+
+        /* BUTTONS */
+        button {
+            padding: 15px 40px; font-size: 20px; background: #aa0000; color: white; border: none;
+            cursor: pointer; border-radius: 5px; margin: 10px; text-transform: uppercase; font-weight: bold;
+            box-shadow: 0 0 15px #550000;
+        }
+
+        /* MOBILE CONTROLS */
+        #mobile-controls {
+            display: none; position: absolute; bottom: 20px; width: 100%; height: 150px; pointer-events: auto; z-index: 10;
+        }
+        #joystick-zone {
+            position: absolute; bottom: 20px; left: 20px; width: 120px; height: 120px;
+            background: rgba(255, 255, 255, 0.1); border-radius: 50%; border: 2px solid rgba(255,255,255,0.2);
+        }
+        #joystick-nub {
+            position: absolute; top: 50%; left: 50%; width: 50px; height: 50px;
+            background: rgba(255, 255, 255, 0.3); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none;
+        }
+        .action-btn {
+            position: absolute; width: 70px; height: 70px; border-radius: 50%;
+            border: 2px solid white; color: white; font-weight: bold; font-size: 14px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #btn-shoot { bottom: 30px; right: 30px; background: rgba(0, 200, 255, 0.4); }
+        #btn-roll { bottom: 110px; right: 30px; background: rgba(255, 200, 0, 0.4); color: white;}
+        #btn-ult { bottom: 30px; right: 110px; background: rgba(255, 50, 50, 0.4); font-size: 12px; }
+
+        .hidden { display: none !important; }
+        @media (hover: none) and (pointer: coarse) { #mobile-controls { display: block; } }
+    </style>
+</head>
+<body>
+
+    <div id="game-container"></div>
+
+    <div id="ui-layer">
+        <div id="hud">
+            <div id="stats">LVL <span id="lvl-val">1</span> | ZONE: <span id="zone-name">FOREST</span></div>
+            <div class="bar-wrap"><div class="bar-label">HP</div><div class="bar-container"><div id="hp-bar"></div></div></div>
+            <div class="bar-wrap"><div class="bar-label">XP</div><div class="bar-container" style="border-color: #0088aa;"><div id="xp-bar"></div></div></div>
+            <div class="bar-wrap"><div class="bar-label">ULTIMATE (Q)</div><div class="bar-container" style="border-color: #aa8800;"><div id="ult-bar"></div></div></div>
+            <div id="objective">Current Goal: Defeat <span id="kill-count">0</span>/5 Enemies</div>
+        </div>
+        <div id="message-area">PORTAL OPENED!</div>
+    </div>
+
+    <div id="mobile-controls">
+        <div id="joystick-zone"><div id="joystick-nub"></div></div>
+        <div id="btn-roll" class="action-btn">ROLL</div>
+        <div id="btn-shoot" class="action-btn">FIRE</div>
+        <div id="btn-ult" class="action-btn">BEAM</div>
+    </div>
+
+    <div id="main-menu" class="menu-screen">
+        <h1 style="color:#ff3333">ZOMBWAR</h1>
+        <h2>Realms of the Warrior</h2>
+        <p style="color:#aaa; text-align:center;">WASD to Move &bull; SPACE to Shoot &bull; SHIFT to Roll &bull; Q for Beam<br>Find the Portal to advance.</p>
+        <button id="start-btn">Start Journey</button>
+    </div>
+
+    <div id="levelup-screen" class="menu-screen hidden">
+        <h1 style="color: #00ccff;">LEVEL UP!</h1>
+        <div class="card-container">
+            <div class="card" onclick="upgrade('dmg')"><h3>STRENGTH</h3><p>+Damage</p></div>
+            <div class="card" onclick="upgrade('hp')"><h3>VITALITY</h3><p>+Max HP & Heal</p></div>
+            <div class="card" onclick="upgrade('beam')"><h3>FOCUS</h3><p>Wider Beam</p></div>
+        </div>
+    </div>
+
+    <div id="game-over-screen" class="menu-screen hidden">
+        <h1 style="color: red;">YOU DIED</h1>
+        <button onclick="location.reload()">Try Again</button>
+    </div>
+
+    <div id="win-screen" class="menu-screen hidden">
+        <h1 style="color: gold;">VICTORY!</h1>
+        <button onclick="location.reload()">Play Again</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        /** 1. CONFIG & ASSETS **/
+        const ZONES = {
+            1: { name: 'FOREST', color: 0x2d5a27, fog: 0x112211, tree: 0x006400, req: 5 },
+            2: { name: 'ICE',    color: 0xe0f7fa, fog: 0x88ccff, tree: 0x88aabb, req: 8 },
+            3: { name: 'DESERT', color: 0xc2b280, fog: 0xffeecc, tree: 0x8b4513, req: 10 },
+            4: { name: 'BOSS',   color: 0x220000, fog: 0x440000, tree: 0x000000, req: 1 }
+        };
+
+        function createNoiseTex(colorHex) {
+            const s=256; const c=document.createElement('canvas'); c.width=s; c.height=s;
+            const ctx=c.getContext('2d'); ctx.fillStyle='#'+new THREE.Color(colorHex).getHexString(); ctx.fillRect(0,0,s,s);
+            for(let i=0;i<4000;i++){ ctx.fillStyle='#00000011'; ctx.fillRect(Math.random()*s,Math.random()*s,2,2); }
+            const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+        }
+
+        const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+        function playSfx(type) {
+            if(audioCtx.state==='suspended') audioCtx.resume();
+            const o=audioCtx.createOscillator(); const g=audioCtx.createGain();
+            o.connect(g); g.connect(audioCtx.destination);
+            const now=audioCtx.currentTime;
+            if(type=='shoot'){ o.frequency.setValueAtTime(600,now); o.frequency.exponentialRampToValueAtTime(100,now+0.1); g.gain.setValueAtTime(0.1,now); g.gain.linearRampToValueAtTime(0,now+0.1); o.start(); o.stop(now+0.1); }
+            if(type=='beam'){ o.type='sawtooth'; o.frequency.setValueAtTime(100,now); g.gain.setValueAtTime(0.2,now); g.gain.linearRampToValueAtTime(0,now+1); o.start(); o.stop(now+1); }
+            if(type=='portal'){ o.type='sine'; o.frequency.setValueAtTime(800,now); g.gain.setValueAtTime(0.3,now); g.gain.linearRampToValueAtTime(0,now+1); o.start(); o.stop(now+1); }
+        }
+
+        /** 2. SETUP **/
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({antialias:true});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.getElementById('game-container').appendChild(renderer.domElement);
+
+        const ambLight = new THREE.AmbientLight(0x404040); scene.add(ambLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(50, 100, 50); dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width=2048; dirLight.shadow.mapSize.height=2048;
+        scene.add(dirLight);
+
+        // GROUND
+        const groundGeo = new THREE.PlaneGeometry(300, 300);
+        const groundMat = new THREE.MeshStandardMaterial({roughness: 0.8});
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI/2; ground.receiveShadow = true;
+        scene.add(ground);
+
+        /** 3. GAME STATE **/
+        const state = {
+            active: false, paused: false,
+            zone: 1, kills: 0,
+            hp: 100, maxHp: 100, xp: 0, xpReq: 50, lvl: 1,
+            ult: 0, dmg: 20, beamWidth: 1,
+            enemies: [], proj: [], scenery: [],
+            portal: null, portalActive: false,
+            rollTime: 0, isRolling: false, lastShot: 0
+        };
+
+        /** 4. CLASSES **/
+        class Warrior {
+            constructor() {
+                this.mesh = new THREE.Group();
+                const armorMat = new THREE.MeshStandardMaterial({color: 0x444444});
+                const skinMat = new THREE.MeshStandardMaterial({color: 0xaa8866});
+                
+                // Body
+                const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.3), armorMat); torso.position.y=0.7; torso.castShadow=true;
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.35, 0.35), armorMat); head.position.y=1.3;
+                const visor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.2), new THREE.MeshBasicMaterial({color:0x00ccff})); visor.position.set(0,1.3,0.15);
+                
+                this.mesh.add(torso, head, visor);
+
+                // Pivots
+                this.lArm = new THREE.Group(); this.lArm.position.set(-0.35, 0.9, 0);
+                this.rArm = new THREE.Group(); this.rArm.position.set(0.35, 0.9, 0);
+                this.lLeg = new THREE.Group(); this.lLeg.position.set(-0.15, 0.35, 0);
+                this.rLeg = new THREE.Group(); this.rLeg.position.set(0.15, 0.35, 0);
+                this.mesh.add(this.lArm, this.rArm, this.lLeg, this.rLeg);
+
+                // Limbs
+                const limbG = new THREE.BoxGeometry(0.15, 0.5, 0.15);
+                [this.lArm, this.rArm, this.lLeg, this.rLeg].forEach(p => {
+                    const m = new THREE.Mesh(limbG, armorMat); m.position.y = -0.25; p.add(m);
+                });
+                
+                scene.add(this.mesh);
+            }
+            animate(type, t) {
+                if(type === 'roll') { this.mesh.rotation.x += 0.4; this.mesh.position.y = 0.3; return; }
+                this.mesh.rotation.x = 0; this.mesh.position.y = 0;
+                
+                if(type === 'run') {
+                    this.lLeg.rotation.x = Math.sin(t*15)*0.8; this.rLeg.rotation.x = Math.sin(t*15+Math.PI)*0.8;
+                    this.lArm.rotation.x = Math.sin(t*15+Math.PI)*0.8; this.rArm.rotation.x = Math.sin(t*15)*0.8;
+                } else if(type === 'shoot') {
+                    this.rArm.rotation.x = -1.5;
+                } else {
+                    this.lLeg.rotation.x = 0; this.rLeg.rotation.x = 0;
+                }
+            }
+        }
+        const player = new Warrior();
+
+        // PORTAL CLASS
+        class Portal {
+            constructor() {
+                this.mesh = new THREE.Group();
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(3, 0.3, 16, 32), new THREE.MeshBasicMaterial({color: 0x00ffff}));
+                const inner = new THREE.Mesh(new THREE.CircleGeometry(3, 32), new THREE.MeshBasicMaterial({color: 0x0000ff, transparent: true, opacity: 0.5, side: THREE.DoubleSide}));
+                this.mesh.add(ring, inner);
+                this.mesh.position.set(0, 3, -40); // Spawn ahead
+                this.mesh.visible = false;
+                scene.add(this.mesh);
+            }
+            spawn() {
+                this.mesh.visible = true;
+                playSfx('portal');
+                // Spawn randomly away from player
+                const ang = Math.random() * Math.PI * 2;
+                this.mesh.position.set(Math.cos(ang)*30, 3, Math.sin(ang)*30);
+                this.mesh.lookAt(player.mesh.position);
+            }
+            hide() { this.mesh.visible = false; }
+        }
+        const portal = new Portal();
+
+        /** 5. LOGIC **/
+        
+        function loadZone(id) {
+            state.zone = id;
+            state.kills = 0;
+            state.portalActive = false;
+            portal.hide();
+
+            // Environment
+            const z = ZONES[id];
+            const tex = createNoiseTex(z.color);
+            tex.repeat.set(40, 40);
+            ground.material.map = tex; ground.material.needsUpdate = true;
+            scene.fog = new THREE.Fog(z.fog, 20, 80);
+            scene.background = new THREE.Color(z.fog);
+
+            // Scenery
+            state.scenery.forEach(s => scene.remove(s)); state.scenery = [];
+            for(let i=0; i<30; i++) {
+                if(id === 4) break; // No trees in Boss room
+                const x = (Math.random()-0.5)*150; const zPos = (Math.random()-0.5)*150;
+                if(Math.abs(x)<10 && Math.abs(zPos)<10) continue;
+                
+                const grp = new THREE.Group(); grp.position.set(x, 0, zPos);
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 2), new THREE.MeshStandardMaterial({color: 0x5c4033})); trunk.position.y=1;
+                const leaf = new THREE.Mesh(new THREE.ConeGeometry(2, 4, 8), new THREE.MeshStandardMaterial({color: z.tree})); leaf.position.y=3;
+                grp.add(trunk, leaf); scene.add(grp); state.scenery.push(grp);
+            }
+            updateUI();
+        }
+
+        function spawnEnemy() {
+            if(state.portalActive) return; // Don't spawn if portal is open
+            
+            const isBoss = state.zone === 4;
+            const grp = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({color: isBoss?0x880000:0x558844});
+            
+            if(isBoss) {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(4,4,8), mat); body.position.y=3;
+                const wings = new THREE.Mesh(new THREE.BoxGeometry(12,0.5,4), mat); wings.position.set(0,5,0);
+                grp.add(body, wings);
+            } else {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.8, 0.8), mat); body.position.y=0.9;
+                const arm = new THREE.Mesh(new THREE.BoxGeometry(2, 0.4, 0.4), mat); arm.position.set(0,1.4,0.4);
+                const eye = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.1), new THREE.MeshBasicMaterial({color:0xff0000})); eye.position.set(0,1.6,0.45);
+                grp.add(body, arm, eye);
+            }
+
+            const ang = Math.random()*Math.PI*2; const dist = 40;
+            grp.position.set(player.mesh.position.x + Math.cos(ang)*dist, 0, player.mesh.position.z + Math.sin(ang)*dist);
+            
+            scene.add(grp);
+            state.enemies.push({
+                mesh: grp, hp: isBoss?1000:(30+state.zone*10), maxHp: isBoss?1000:(30+state.zone*10),
+                dmg: isBoss?40:(5+state.zone), speed: isBoss?0.08:(0.05+state.zone*0.01), isBoss: isBoss
+            });
+        }
+
+        function openPortal() {
+            state.portalActive = true;
+            portal.spawn();
+            const msg = document.getElementById('message-area');
+            msg.innerText = "PORTAL OPENED!"; msg.style.opacity = 1;
+            setTimeout(()=>msg.style.opacity=0, 3000);
+            document.getElementById('objective').innerText = "ENTER THE PORTAL!";
+        }
+
+        function enterPortal() {
+            if(state.zone < 4) {
+                loadZone(state.zone + 1);
+            } else {
+                state.active = false;
+                document.getElementById('win-screen').classList.remove('hidden');
+            }
+        }
+
+        function gainXP(amt) {
+            state.xp += amt; state.ult = Math.min(state.ult+10, 100);
+            if(state.xp >= state.xpReq) {
+                state.lvl++; state.xp=0; state.xpReq = Math.floor(state.xpReq*1.5);
+                state.paused = true; document.getElementById('levelup-screen').classList.remove('hidden');
+            }
+            updateUI();
+        }
+
+        window.upgrade = (type) => {
+            if(type=='dmg') state.dmg+=10;
+            if(type=='hp') { state.maxHp+=50; state.hp=state.maxHp; }
+            if(type=='beam') state.beamWidth+=1;
+            state.paused = false; document.getElementById('levelup-screen').classList.add('hidden');
+            updateUI();
+        }
+
+        function fireBeam() {
+            if(state.ult < 100) return;
+            state.ult = 0; playSfx('beam');
+            
+            const geo = new THREE.CylinderGeometry(state.beamWidth, state.beamWidth, 40, 8); geo.rotateX(-Math.PI/2); geo.translate(0,0,20);
+            const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color:0xffcc00, transparent:true, opacity:0.8}));
+            m.position.copy(player.mesh.position); m.position.y=1.5; m.rotation.y = player.mesh.rotation.y;
+            scene.add(m); setTimeout(()=>scene.remove(m), 500);
+
+            // Collision
+            const pPos = player.mesh.position; 
+            const pDir = new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0), player.mesh.rotation.y);
+            state.enemies.forEach(en => {
+                const toEn = new THREE.Vector3().subVectors(en.mesh.position, pPos).normalize();
+                if(pPos.distanceTo(en.mesh.position)<40 && pDir.angleTo(toEn) < 0.3*state.beamWidth) en.hp -= 200;
+            });
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('hp-bar').style.width = (state.hp/state.maxHp*100)+'%';
+            document.getElementById('xp-bar').style.width = (state.xp/state.xpReq*100)+'%';
+            document.getElementById('ult-bar').style.width = state.ult+'%';
+            document.getElementById('lvl-val').innerText = state.lvl;
+            document.getElementById('zone-name').innerText = ZONES[state.zone].name;
+            if(!state.portalActive) document.getElementById('kill-count').innerText = state.kills;
+        }
+
+        /** 6. CONTROLS **/
+        const keys={w:0,a:0,s:0,d:0,sp:0,sh:0,q:0}; const input={x:0,y:0,shoot:0,roll:0,ult:0};
+        window.onkeydown=e=>{ if(e.key=='w')keys.w=1;if(e.key=='s')keys.s=1;if(e.key=='a')keys.a=1;if(e.key=='d')keys.d=1;if(e.code=='Space')keys.sp=1;if(e.key=='Shift')keys.sh=1;if(e.key=='q')keys.q=1;}
+        window.onkeyup=e=>{ if(e.key=='w')keys.w=0;if(e.key=='s')keys.s=0;if(e.key=='a')keys.a=0;if(e.key=='d')keys.d=0;if(e.code=='Space')keys.sp=0;if(e.key=='Shift')keys.sh=0;if(e.key=='q')keys.q=0;}
+
+       // Touch
+        const jZ=document.getElementById('joystick-zone'); let tId=null;
+        jZ.ontouchstart=e=>{e.preventDefault(); tId=e.changedTouches[0].identifier; updJoy(e.changedTouches[0]);}
+        jZ.ontouchmove=e=>{e.preventDefault(); for(let t of e.changedTouches) if(t.identifier==tId) updJoy(t);}
+        jZ.ontouchend=e=>{tId=null; input.x=0; input.y=0; document.getElementById('joystick-nub').style.transform=`translate(-50%,-50%)`;}
+        function updJoy(t){
+            const r=jZ.getBoundingClientRect(); const dx=t.clientX-(r.left+60); const dy=t.clientY-(r.top+60);
+            const ang=Math.atan2(dy,dx); const dist=Math.min(Math.sqrt(dx*dx+dy*dy),40);
+            input.x=Math.cos(ang)*dist/40; input.y=Math.sin(ang)*dist/40;
+            document.getElementById('joystick-nub').style.transform=`translate(calc(-50% + ${input.x*40}px),calc(-50% + ${input.y*40}px))`;
+        }
+        const bBind=(id,k)=>{const b=document.getElementById(id); b.ontouchstart=e=>{e.preventDefault();input[k]=1}; b.ontouchend=e=>{e.preventDefault();input[k]=0};}
+        bBind('btn-shoot','shoot'); bBind('btn-roll','roll'); bBind('btn-ult','ult');
+
+        /** 7. LOOP **/
+        function animate() {
+            requestAnimationFrame(animate);
+            if(!state.active || state.paused) { renderer.render(scene, camera); return; }
+
+            const time = Date.now()*0.001;
+            
+            // Move
+            let mx = (keys.d-keys.a)+input.x; let my = (keys.s-keys.w)+input.y;
+            const isMove = mx!=0 || my!=0;
+            const isRoll = (keys.sh||input.roll) && !state.isRolling && isMove;
+            const isShoot = (keys.sp||input.shoot) && !state.isRolling;
+            const isUlt = (keys.q||input.ult);
+
+            if(isRoll && Date.now()-state.rollTime > 1000) { state.isRolling=true; state.rollTime=Date.now(); setTimeout(()=>state.isRolling=false, 500); }
+            const speed = state.isRolling ? 0.4 : 0.15;
+
+            if(isMove) {
+                player.mesh.position.x += mx*speed; player.mesh.position.z += my*speed;
+                player.mesh.rotation.y = Math.atan2(mx, my);
+            }
+
+            // Animate
+            if(state.isRolling) player.animate('roll', time);
+            else if(isShoot) player.animate('shoot', time);
+            else if(isMove) player.animate('run', time);
+            else player.animate('idle', time);
+
+            // Camera
+            camera.position.set(player.mesh.position.x, player.mesh.position.y+10, player.mesh.position.z+10);
+            camera.lookAt(player.mesh.position);
+
+            // Shoot
+            if(isShoot && Date.now()-state.lastShot > 300) {
+                state.lastShot=Date.now(); playSfx('shoot');
+                const p = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color:0x00ffff}));
+                const off = new THREE.Vector3(0.5,0,0.5).applyAxisAngle(new THREE.Vector3(0,1,0), player.mesh.rotation.y);
+                p.position.copy(player.mesh.position).add(new THREE.Vector3(0,1.5,0)).add(off);
+                p.userData = {vx: Math.sin(player.mesh.rotation.y)*0.8, vz: Math.cos(player.mesh.rotation.y)*0.8, life:60};
+                scene.add(p); state.proj.push(p);
+            }
+            if(isUlt) fireBeam();
+
+            // Projectiles
+            state.proj.forEach((p,i)=>{
+                p.position.x+=p.userData.vx; p.position.z+=p.userData.vz; p.userData.life--;
+                if(p.userData.life<=0){scene.remove(p); state.proj.splice(i,1);}
+            });
+
+            // Enemies
+            if(state.enemies.length < 3+state.lvl && !state.portalActive && state.kills < ZONES[state.zone].req) spawnEnemy();
+
+            state.enemies.forEach((en,i)=>{
+                // Move
+                const dx=player.mesh.position.x-en.mesh.position.x; const dz=player.mesh.position.z-en.mesh.position.z;
+                const dist=Math.sqrt(dx*dx+dz*dz);
+                if(dist>1.5) { en.mesh.position.x+=dx/dist*en.speed; en.mesh.position.z+=dz/dist*en.speed; en.mesh.lookAt(player.mesh.position); }
+                else if(!state.isRolling && Math.random()<0.05) { state.hp-=en.dmg; updateUI(); if(state.hp<=0){state.active=false; document.getElementById('game-over-screen').classList.remove('hidden');}}
+
+                // Hit
+                state.proj.forEach((p,pi)=>{
+                    if(p.position.distanceTo(en.mesh.position)<2.5) {
+                        en.hp-=state.dmg; scene.remove(p); state.proj.splice(pi,1);
+                        if(en.hp<=0) {
+                            scene.remove(en.mesh); state.enemies.splice(i,1);
+                            state.kills++; gainXP(20);
+                            if(state.kills >= ZONES[state.zone].req) openPortal();
+                        }
+                    }
+                });
+            });
+
+            // Portal Check
+            if(state.portalActive && portal.mesh.visible) {
+                portal.mesh.rotation.y += 0.05;
+                if(player.mesh.position.distanceTo(portal.mesh.position) < 6) enterPortal();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // INIT
+        document.getElementById('start-btn').onclick=()=>{
+            state.active=true; document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('hud').style.display='block';
+            loadZone(1); animate();
+        };
+        window.onresize=()=>{camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth,window.innerHeight);}
+
+    </script>
+</body>
+</html>
